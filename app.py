@@ -108,7 +108,7 @@ def logout():
 @app.route("/pricing")
 @login_required
 def pricing():
-    return render_template("pricing.html", ls_api_key=os.getenv("LEMON_SQUEEZY_API_KEY", ""))
+    return render_template("pricing.html", gumroad_url=os.getenv("GUMROAD_URL", ""))
 
 @app.route("/dashboard")
 @login_required
@@ -118,73 +118,13 @@ def dashboard():
     conn.close()
     return render_template("dashboard.html", generations=gens, subscribed=session.get("subscribed", 0))
 
-@app.route("/create-checkout", methods=["POST"])
+@app.route("/subscribe")
 @login_required
-def create_checkout():
-    api_key = os.getenv("LEMON_SQUEEZY_API_KEY")
-    store_id = os.getenv("LEMON_SQUEEZY_STORE_ID")
-    variant_id = os.getenv("LEMON_SQUEEZY_VARIANT_ID")
-
-    if not api_key or not store_id or not variant_id:
-        return jsonify({"error": "Payment not configured. Contact admin."}), 500
-
-    import urllib.request
-
-    data = json.dumps({
-        "data": {
-            "type": "checkouts",
-            "attributes": {
-                "checkout_data": {
-                    "custom": {"user_id": str(session["user_id"])},
-                    "email": session.get("user_email", ""),
-                }
-            },
-            "relationships": {
-                "store": {"data": {"type": "stores", "id": store_id}},
-                "variant": {"data": {"type": "variants", "id": variant_id}},
-            }
-        }
-    }).encode()
-
-    req = urllib.request.Request(
-        "https://api.lemonsqueezy.com/v1/checkouts",
-        data=data,
-        headers={
-            "Authorization": f"Bearer {api_key}",
-            "Content-Type": "application/json",
-            "Accept": "application/json",
-        },
-        method="POST",
-    )
-    try:
-        resp = urllib.request.urlopen(req)
-        result = json.loads(resp.read())
-        url = result["data"]["attributes"]["url"]
-        return jsonify({"url": url})
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-@app.route("/ls-webhook", methods=["POST"])
-def ls_webhook():
-    api_key = os.getenv("LEMON_SQUEEZY_API_KEY")
-    body = request.get_data(as_text=True)
-    sig = request.headers.get("X-Signature", "")
-
-    import hmac
-    expected = hmac.new(os.getenv("LEMON_SQUEEZY_WEBHOOK_SECRET", "").encode(), body.encode(), hashlib.sha256).hexdigest()
-    if sig != expected:
-        return "", 401
-
-    event = json.loads(body)
-    if event.get("meta", {}).get("event_name") == "order_created":
-        custom = event["data"]["attributes"]["first_order"]["custom"]
-        user_id = custom.get("user_id")
-        if user_id:
-            conn = get_db()
-            conn.execute("UPDATE users SET subscribed = 1 WHERE id = ?", (user_id,))
-            conn.commit()
-            conn.close()
-    return "", 200
+def subscribe():
+    gumroad_url = os.getenv("GUMROAD_URL")
+    if not gumroad_url:
+        return "Payment not configured", 500
+    return redirect(gumroad_url)
 
 @app.route("/generate", methods=["POST"])
 @login_required

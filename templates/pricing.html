@@ -32,21 +32,11 @@
             {% if session.subscribed %}
                 <p class="active-badge">Active</p>
             {% else %}
-                <button id="checkout-btn" class="btn-primary btn-large">Subscribe Now</button>
+                <a href="/subscribe" class="btn-primary btn-large">Subscribe Now</a>
             {% endif %}
         </div>
     </section>
 
     <script>
-        document.getElementById('checkout-btn')?.addEventListener('click', async () => {
-            const btn = document.getElementById('checkout-btn');
-            btn.textContent = 'Redirecting...';
-            btn.disabled = true;
-            const res = await fetch('/create-checkout', { method: 'POST' });
-            const data = await res.json();
-            if (data.url) window.location.href = data.url;
-            else { alert('Error: ' + (data.error || 'Unknown')); btn.textContent = 'Subscribe Now'; btn.disabled = false; }
-        });
-    </script>
 </body>
 </html>

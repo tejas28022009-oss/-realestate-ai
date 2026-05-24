@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - RealEstate AI</title>
+    <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+    <nav>
+        <div class="logo">RealEstate AI</div>
+        <div class="nav-links">
+            <a href="/">Home</a>
+            <a href="/pricing">Pricing</a>
+            <a href="/logout">Logout</a>
+        </div>
+    </nav>
+
+    <section class="dashboard">
+        <div class="dash-header">
+            <h2>Welcome, {{ session.user_name }}</h2>
+            {% if subscribed %}
+                <span class="badge active">Active</span>
+            {% else %}
+                <span class="badge inactive">Not Subscribed</span>
+                <a href="/pricing" class="btn-primary">Subscribe - $500/mo</a>
+            {% endif %}
+        </div>
+
+        {% if subscribed %}
+        <div class="generator">
+            <h3>Generate Content</h3>
+            <form id="gen-form">
+                <div class="form-row">
+                    <input type="text" name="address" placeholder="Property Address" required>
+                </div>
+                <div class="form-row">
+                    <select name="property_type">
+                        <option value="Single Family">Single Family</option>
+                        <option value="Condo">Condo</option>
+                        <option value="Townhouse">Townhouse</option>
+                        <option value="Multi-Family">Multi-Family</option>
+                        <option value="Commercial">Commercial</option>
+                        <option value="Land">Land</option>
+                    </select>
+                    <input type="number" name="beds" placeholder="Bedrooms">
+                    <input type="number" name="baths" placeholder="Bathrooms">
+                </div>
+                <div class="form-row">
+                    <input type="number" name="sqft" placeholder="Square Feet">
+                    <input type="number" name="price" placeholder="Price ($)" step="0.01">
+                </div>
+                <button type="submit" class="btn-primary">Generate Content</button>
+            </form>
+        </div>
+
+        <div id="results" class="results" style="display:none;">
+            <h3>Generated Content</h3>
+            <div class="result-tabs">
+                <button class="tab active" data-tab="listing">MLS Listing</button>
+                <button class="tab" data-tab="instagram">Instagram</button>
+                <button class="tab" data-tab="email">Email Blast</button>
+            </div>
+            <div class="result-content" id="result-content"></div>
+        </div>
+
+        <div class="history">
+            <h3>Recent Generations</h3>
+            {% if generations %}
+                {% for g in generations %}
+                <div class="history-card">
+                    <strong>{{ g.property_address or 'Unknown' }}</strong>
+                    <p>{{ g.property_type }} | {{ g.bedrooms }} bed / {{ g.bathrooms }} bath | {{ g.square_feet }} sqft | ${{ "{:,.0f}".format(g.price) if g.price else 'N/A' }}</p>
+                    <small>Generated {{ g.created_at }}</small>
+                </div>
+                {% endfor %}
+            {% else %}
+                <p>No generations yet. Generate your first content above!</p>
+            {% endif %}
+        </div>
+        {% endif %}
+    </section>
+
+    <script>
+        {% if subscribed %}
+        document.getElementById('gen-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const form = e.target;
+            const data = {
+                address: form.address.value,
+                property_type: form.property_type.value,
+                beds: form.beds.value,
+                baths: form.baths.value,
+                sqft: form.sqft.value,
+                price: form.price.value,
+            };
+            const btn = form.querySelector('button');
+            btn.textContent = 'Generating...';
+            btn.disabled = true;
+
+            const res = await fetch('/generate', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data) });
+            const result = await res.json();
+
+            if (result.error) {
+                alert(result.error);
+            } else {
+                document.getElementById('results').style.display = 'block';
+                showTab('listing', result.listing || '');
+                window.currentResult = result;
+            }
+            btn.textContent = 'Generate Content';
+            btn.disabled = false;
+        });
+
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                tab.classList.add('active');
+                showTab(tab.dataset.tab);
+            });
+        });
+
+        function showTab(tab, content) {
+            const r = window.currentResult || {};
+            const div = document.getElementById('result-content');
+            let text = '';
+            if (tab === 'listing') text = content || r.listing || '';
+            else if (tab === 'instagram') text = content || r.instagram || '';
+            else if (tab === 'email') text = content || r.email || '';
+            div.innerHTML = `<pre>${text}</pre><button class="btn-primary" onclick="navigator.clipboard.writeText(\`${text.replace(/`/g, '\\`')}\`)">Copy</button>`;
+        }
+        {% endif %}
+    </script>
+</body>
+</html>

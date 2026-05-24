@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pricing - RealEstate AI</title>
+    <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+    <nav>
+        <div class="logo">RealEstate AI</div>
+        <div class="nav-links">
+            <a href="/">Home</a>
+            <a href="/dashboard">Dashboard</a>
+            <a href="/logout">Logout</a>
+        </div>
+    </nav>
+
+    <section class="pricing-page">
+        <h2>Choose Your Plan</h2>
+        <div class="price-card featured">
+            <h3>Professional</h3>
+            <p class="price">$500<span>/month</span></p>
+            <ul>
+                <li>Unlimited property generations</li>
+                <li>MLS listing descriptions</li>
+                <li>Instagram captions with hashtags</li>
+                <li>Email blast templates</li>
+                <li>Export to PDF</li>
+                <li>Priority email support</li>
+            </ul>
+            {% if session.subscribed %}
+                <p class="active-badge">Active</p>
+            {% else %}
+                <button id="checkout-btn" class="btn-primary btn-large">Subscribe Now</button>
+            {% endif %}
+        </div>
+    </section>
+
+    <script src="https://js.stripe.com/v3/"></script>
+    <script>
+        document.getElementById('checkout-btn')?.addEventListener('click', async () => {
+            const res = await fetch('/create-checkout-session', { method: 'POST' });
+            const data = await res.json();
+            if (data.url) window.location.href = data.url;
+        });
+    </script>
+</body>
+</html>

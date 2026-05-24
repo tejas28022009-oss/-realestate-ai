@@ -1,0 +1,6 @@
+gunicorn>=21.0
+flask>=3.0
+flask-login>=0.6
+stripe>=7.0
+openai>=1.0
+python-dotenv>=1.0

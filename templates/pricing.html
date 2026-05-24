@@ -37,12 +37,15 @@
         </div>
     </section>
 
-    <script src="https://js.stripe.com/v3/"></script>
     <script>
         document.getElementById('checkout-btn')?.addEventListener('click', async () => {
-            const res = await fetch('/create-checkout-session', { method: 'POST' });
+            const btn = document.getElementById('checkout-btn');
+            btn.textContent = 'Redirecting...';
+            btn.disabled = true;
+            const res = await fetch('/create-checkout', { method: 'POST' });
             const data = await res.json();
             if (data.url) window.location.href = data.url;
+            else { alert('Error: ' + (data.error || 'Unknown')); btn.textContent = 'Subscribe Now'; btn.disabled = false; }
         });
     </script>
 </body>

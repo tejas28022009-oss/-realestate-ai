@@ -1,6 +1,7 @@
 import os
 import sqlite3
 import hashlib
+import json
 from functools import wraps
 from flask import Flask, render_template, request, redirect, url_for, session, jsonify
 from dotenv import load_dotenv
@@ -25,8 +26,8 @@ def init_db():
             email TEXT UNIQUE NOT NULL,
             password TEXT NOT NULL,
             name TEXT NOT NULL,
-            stripe_customer_id TEXT,
             subscribed INTEGER DEFAULT 0,
+            ls_customer_id TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
         CREATE TABLE IF NOT EXISTS generations (
@@ -107,7 +108,7 @@ def logout():
 @app.route("/pricing")
 @login_required
 def pricing():
-    return render_template("pricing.html", stripe_publishable_key=os.getenv("STRIPE_PUBLISHABLE_KEY", "pk_test_key"))
+    return render_template("pricing.html", ls_api_key=os.getenv("LEMON_SQUEEZY_API_KEY", ""))
 
 @app.route("/dashboard")
 @login_required
@@ -117,49 +118,72 @@ def dashboard():
     conn.close()
     return render_template("dashboard.html", generations=gens, subscribed=session.get("subscribed", 0))
 
-@app.route("/create-checkout-session", methods=["POST"])
+@app.route("/create-checkout", methods=["POST"])
 @login_required
 def create_checkout():
-    import stripe
-    stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
-    try:
-        checkout = stripe.checkout.Session.create(
-            payment_method_types=["card"],
-            line_items=[{
-                "price_data": {
-                    "currency": "usd",
-                    "product_data": {"name": "RealEstate AI Copywriter - Monthly"},
-                    "unit_amount": 50000,
-                },
-                "quantity": 1,
-            }],
-            mode="subscription",
-            success_url=url_for("dashboard", _external=True) + "?success=true",
-            cancel_url=url_for("pricing", _external=True) + "?canceled=true",
-            client_reference_id=str(session["user_id"]),
-        )
-        return jsonify({"url": checkout.url})
-    except Exception as e:
-        return jsonify({"error": str(e)}), 400
+    api_key = os.getenv("LEMON_SQUEEZY_API_KEY")
+    store_id = os.getenv("LEMON_SQUEEZY_STORE_ID")
+    variant_id = os.getenv("LEMON_SQUEEZY_VARIANT_ID")
 
-@app.route("/stripe-webhook", methods=["POST"])
-def stripe_webhook():
-    import stripe
-    stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
-    payload = request.get_data()
-    sig_header = request.headers.get("Stripe-Signature")
+    if not api_key or not store_id or not variant_id:
+        return jsonify({"error": "Payment not configured. Contact admin."}), 500
+
+    import urllib.request
+
+    data = json.dumps({
+        "data": {
+            "type": "checkouts",
+            "attributes": {
+                "checkout_data": {
+                    "custom": {"user_id": str(session["user_id"])},
+                    "email": session.get("user_email", ""),
+                }
+            },
+            "relationships": {
+                "store": {"data": {"type": "stores", "id": store_id}},
+                "variant": {"data": {"type": "variants", "id": variant_id}},
+            }
+        }
+    }).encode()
+
+    req = urllib.request.Request(
+        "https://api.lemonsqueezy.com/v1/checkouts",
+        data=data,
+        headers={
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+        },
+        method="POST",
+    )
     try:
-        event = stripe.Webhook.construct_event(payload, sig_header, os.getenv("STRIPE_WEBHOOK_SECRET", ""))
-    except:
-        return "", 400
-    if event["type"] == "checkout.session.completed":
-        session_obj = event["data"]["object"]
-        user_id = session_obj["client_reference_id"]
-        conn = get_db()
-        conn.execute("UPDATE users SET subscribed = 1, stripe_customer_id = ? WHERE id = ?",
-                     (session_obj["customer"], user_id))
-        conn.commit()
-        conn.close()
+        resp = urllib.request.urlopen(req)
+        result = json.loads(resp.read())
+        url = result["data"]["attributes"]["url"]
+        return jsonify({"url": url})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/ls-webhook", methods=["POST"])
+def ls_webhook():
+    api_key = os.getenv("LEMON_SQUEEZY_API_KEY")
+    body = request.get_data(as_text=True)
+    sig = request.headers.get("X-Signature", "")
+
+    import hmac
+    expected = hmac.new(os.getenv("LEMON_SQUEEZY_WEBHOOK_SECRET", "").encode(), body.encode(), hashlib.sha256).hexdigest()
+    if sig != expected:
+        return "", 401
+
+    event = json.loads(body)
+    if event.get("meta", {}).get("event_name") == "order_created":
+        custom = event["data"]["attributes"]["first_order"]["custom"]
+        user_id = custom.get("user_id")
+        if user_id:
+            conn = get_db()
+            conn.execute("UPDATE users SET subscribed = 1 WHERE id = ?", (user_id,))
+            conn.commit()
+            conn.close()
     return "", 200
 
 @app.route("/generate", methods=["POST"])
@@ -194,7 +218,6 @@ Format your response as JSON with keys: listing, instagram, email"""
             response_format={"type": "json_object"},
         )
         result = response.choices[0].message.content
-        import json
         parsed = json.loads(result)
 
         conn = get_db()

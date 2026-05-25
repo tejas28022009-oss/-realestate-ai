@@ -124,7 +124,23 @@ def subscribe():
     gumroad_url = os.getenv("GUMROAD_URL")
     if not gumroad_url:
         return "Payment not configured", 500
-    return redirect(gumroad_url)
+    conn = get_db()
+    user = conn.execute("SELECT email FROM users WHERE id = ?", (session["user_id"],)).fetchone()
+    conn.close()
+    sep = "&" if "?" in gumroad_url else "?"
+    return redirect(f"{gumroad_url}{sep}user_id={session['user_id']}&email={user['email']}")
+
+@app.route("/gumroad-webhook", methods=["POST"])
+def gumroad_webhook():
+    data = request.form
+    user_id = data.get("user_id")
+    sale = data.get("sale_id")
+    if user_id and sale:
+        conn = get_db()
+        conn.execute("UPDATE users SET subscribed = 1 WHERE id = ?", (user_id,))
+        conn.commit()
+        conn.close()
+    return "", 200
 
 @app.route("/generate", methods=["POST"])
 @login_required

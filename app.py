@@ -1,9 +1,11 @@
 import os
 import sqlite3
 import hashlib
+import hmac
 import json
 from functools import wraps
 from flask import Flask, render_template, request, redirect, url_for, session, jsonify
+from werkzeug.security import generate_password_hash, check_password_hash
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -51,6 +53,13 @@ def init_db():
 
 init_db()
 
+def verify_password(stored, password):
+    """Check a password against a salted hash, or an old unsalted SHA-256 hash."""
+    if stored.startswith(("scrypt:", "pbkdf2:")):
+        return check_password_hash(stored, password)
+    legacy = hashlib.sha256(password.encode()).hexdigest()
+    return hmac.compare_digest(stored, legacy)
+
 def login_required(f):
     @wraps(f)
     def decorated(*args, **kwargs):
@@ -67,10 +76,19 @@ def index():
 def login():
     if request.method == "POST":
         email = request.form["email"]
-        password = hashlib.sha256(request.form["password"].encode()).hexdigest()
+        password = request.form["password"]
         conn = get_db()
-        user = conn.execute("SELECT * FROM users WHERE email = ? AND password = ?", (email, password)).fetchone()
-        conn.close()
+        user = conn.execute("SELECT * FROM users WHERE email = ?", (email,)).fetchone()
+        if user and verify_password(user["password"], password):
+            # Upgrade old unsalted hashes to a salted hash on successful login
+            if not user["password"].startswith(("scrypt:", "pbkdf2:")):
+                conn.execute("UPDATE users SET password = ? WHERE id = ?",
+                             (generate_password_hash(password), user["id"]))
+                conn.commit()
+            conn.close()
+        else:
+            conn.close()
+            user = None
         if user:
             session["user_id"] = user["id"]
             session["user_name"] = user["name"]
@@ -84,7 +102,7 @@ def signup():
     if request.method == "POST":
         name = request.form["name"]
         email = request.form["email"]
-        password = hashlib.sha256(request.form["password"].encode()).hexdigest()
+        password = generate_password_hash(request.form["password"])
         conn = get_db()
         try:
             conn.execute("INSERT INTO users (name, email, password) VALUES (?, ?, ?)", (name, email, password))
@@ -130,8 +148,12 @@ def subscribe():
     sep = "&" if "?" in gumroad_url else "?"
     return redirect(f"{gumroad_url}{sep}user_id={session['user_id']}&email={user['email']}")
 
-@app.route("/gumroad-webhook", methods=["POST"])
-def gumroad_webhook():
+@app.route("/gumroad-webhook/<token>", methods=["POST"])
+def gumroad_webhook(token):
+    # Only accept requests that include the secret token from the webhook URL
+    secret = os.getenv("GUMROAD_WEBHOOK_SECRET", "")
+    if not secret or not hmac.compare_digest(token, secret):
+        return "", 403
     data = request.form
     user_id = data.get("user_id")
     sale = data.get("sale_id")

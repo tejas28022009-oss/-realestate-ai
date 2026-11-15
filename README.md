@@ -1,33 +1,66 @@
-[profile-README.md](https://github.com/user-attachments/files/34868001/profile-README.md)
-# Hi, I'm Tejas B. Patole
+# RealEstate AI Copywriter
 
-I'm a college student who builds and ships real products: web apps, SaaS tools and AI assistants. I'm looking for a software development or AI internship where I can build on real projects and learn from a team.
+An AI-powered SaaS web app that helps real estate agents turn basic property details into marketing content in seconds: a professional listing description, an Instagram caption and an email blast for buyers.
 
-## What I Build
+![RealEstate AI Copywriter](static/cover.png)
 
-- Full-stack web applications and SaaS products
-- AI-powered tools and assistants
-- Test automation frameworks
+## Features
+
+- **AI content generation:** Enter the address, property type, beds, baths, square feet and price, and get three ready-to-use pieces of content from OpenAI GPT-4o.
+- **User accounts:** Sign up, log in and log out with session-based authentication.
+- **Paid subscription:** Gumroad checkout with a webhook that activates the user's account automatically after purchase.
+- **Dashboard:** View your 10 most recent generations.
+- **Landing and pricing pages:** A clear product page with an example of the output.
 
 ## Tech Stack
 
-![Python](https://img.shields.io/badge/Python-3776AB?style=flat&logo=python&logoColor=white)
-![Flask](https://img.shields.io/badge/Flask-000000?style=flat&logo=flask&logoColor=white)
-![Java](https://img.shields.io/badge/Java-ED8B00?style=flat&logo=openjdk&logoColor=white)
-![Selenium](https://img.shields.io/badge/Selenium-43B02A?style=flat&logo=selenium&logoColor=white)
-![HTML](https://img.shields.io/badge/HTML5-E34F26?style=flat&logo=html5&logoColor=white)
-![CSS](https://img.shields.io/badge/CSS3-1572B6?style=flat&logo=css3&logoColor=white)
-![OpenAI](https://img.shields.io/badge/OpenAI_API-412991?style=flat&logo=openai&logoColor=white)
-![SQLite](https://img.shields.io/badge/SQLite-003B57?style=flat&logo=sqlite&logoColor=white)
-![Git](https://img.shields.io/badge/Git-F05032?style=flat&logo=git&logoColor=white)
+| Area | Tools |
+| --- | --- |
+| Backend | Python, Flask |
+| Database | SQLite |
+| AI | OpenAI API (GPT-4o) |
+| Payments | Gumroad |
+| Frontend | HTML, CSS, Jinja templates |
+| Deployment | Gunicorn (`Procfile` included) |
 
-## Featured Projects
+## Getting Started
 
-- **[RealEstate AI Copywriter](https://github.com/tejas28022009-oss/-realestate-ai):** An AI SaaS built with Flask and OpenAI GPT-4o that generates listing descriptions, Instagram captions and email blasts for real estate agents, with user accounts and a paid subscription flow.
-- **[Automation Testing Framework](https://github.com/tejas28022009-oss/automation-testing):** A Java framework using Selenium, Cucumber BDD and TestNG with the Page Object Model, parallel runs, reports and multi-environment configuration.
+1. Clone the repository and install the dependencies:
 
-## Connect With Me
+   ```bash
+   git clone https://github.com/tejas28022009-oss/-realestate-ai.git
+   cd -realestate-ai
+   pip install -r requirements.txt
+   ```
 
-- Email: [your.email@gmail.com]
-- LinkedIn: [your LinkedIn URL]
-- Portfolio: [your portfolio URL]
+2. Create a `.env` file in the project folder:
+
+   ```
+   SECRET_KEY=your-secret-key
+   OPENAI_API_KEY=your-openai-api-key
+   GUMROAD_URL=your-gumroad-product-url
+   GUMROAD_WEBHOOK_SECRET=a-long-random-string
+   ```
+
+   Set your Gumroad ping URL to `https://your-domain/gumroad-webhook/<GUMROAD_WEBHOOK_SECRET>`.
+
+3. Run the app:
+
+   ```bash
+   python app.py
+   ```
+
+4. Open `http://localhost:5000` in your browser.
+
+## Project Structure
+
+```
+app.py            Flask app: routes, database, AI generation, payment webhook
+templates/        Landing, login, pricing and dashboard pages
+static/           Styles and images
+Procfile          Gunicorn start command for deployment
+```
+
+## Author
+
+Built by [Tejas B. Patole](https://github.com/tejas28022009-oss).
